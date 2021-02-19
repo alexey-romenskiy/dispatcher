@@ -16,6 +16,14 @@ public class ReflectionDispatcherFactory extends AbstractDispatcherFactory {
             @Nonnull Class<T> dispatcherType,
             @Nonnull Map<Method, Map<Class<?>, InvocationEntry>> map
     ) {
+        for (final var entry : map.entrySet()) {
+            for (final var value : entry.getValue().values()) {
+                final var method = value.method;
+                if (!method.canAccess(value.target)) {
+                    method.setAccessible(true);
+                }
+            }
+        }
         return cast(newProxyInstance(dispatcherType.getClassLoader(), new Class[]{dispatcherType},
                 (proxy, method, args) -> invoke(map, method, args[0].getClass(), args)));
     }

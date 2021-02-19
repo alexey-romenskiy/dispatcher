@@ -53,9 +53,6 @@ abstract class AbstractDispatcherFactory implements DispatcherFactory {
                     if (type.isAnnotation()) {
                         throw new DispatcherException("First delegate parameter must not be annotation: " + method);
                     }
-                    if (type.isInterface()) {
-                        throw new DispatcherException("First delegate parameter must not be interface: " + method);
-                    }
                     for (final var entry : baseTypeAndParamsToDispatcherMethod.entrySet()) {
                         if (entry.getKey().isAssignableFrom(type)) {
                             final var dispatcherMethod = entry.getValue().get(getParameters(parameterTypes));
