@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static codes.writeonce.dispatcher.Helper.find;
 import static java.util.Arrays.asList;
 
 abstract class AbstractDispatcherFactory implements DispatcherFactory {
@@ -16,12 +17,33 @@ abstract class AbstractDispatcherFactory implements DispatcherFactory {
     @Override
     @Nonnull
     public <T> T wrap(@Nonnull Class<T> dispatcherType, @Nonnull Object... delegates) {
+        return createStub(dispatcherType, generateMap(dispatcherType, delegates));
+    }
 
+    @Override
+    public void test(@Nonnull Class<?> dispatcherType, @Nonnull Object[] delegates, @Nonnull Class<?>... subtypes)
+            throws DispatcherException {
+
+        final var map = generateMap(dispatcherType, delegates);
+
+        for (final var method : dispatcherType.getMethods()) {
+            for (final var subtype : subtypes) {
+                find(map.get(method), method, subtype);
+            }
+        }
+    }
+
+    @Nonnull
+    private <T> Map<Method, Map<Class<?>, InvocationEntry>> generateMap(
+            @Nonnull Class<T> dispatcherType,
+            @Nonnull Object... delegates
+    ) {
         if (!dispatcherType.isInterface()) {
             throw new DispatcherException("First parameter must be interface: " + dispatcherType);
         }
 
-        final var baseTypeAndParamsToDispatcherMethod = new HashMap<Class<?>, Map<List<Class<?>>, Method>>();
+        final var baseTypeAndParamsToDispatcherMethod =
+                new HashMap<Class<?>, HashMap<Class<?>, Map<List<Class<?>>, Method>>>();
         final var dispatcherMethodAndImplTypeToDelegate = new HashMap<Method, Map<Class<?>, InvocationEntry>>();
 
         for (final var method : dispatcherType.getMethods()) {
@@ -29,9 +51,11 @@ abstract class AbstractDispatcherFactory implements DispatcherFactory {
             if (parameterTypes.length < 1) {
                 throw new DispatcherException("Dispatcher method has too few parameters: " + method);
             }
-            final var baseType = parameterTypes[0];
-            if (baseTypeAndParamsToDispatcherMethod.computeIfAbsent(baseType, k -> new HashMap<>())
+            if (baseTypeAndParamsToDispatcherMethod
+                        .computeIfAbsent(method.getReturnType(), k -> new HashMap<>())
+                        .computeIfAbsent(parameterTypes[0], k -> new HashMap<>())
                         .put(getParameters(parameterTypes), method) != null) {
+
                 throw new DispatcherException("Duplicate dispatcher method signature: " + method);
             }
             if (dispatcherMethodAndImplTypeToDelegate.put(method, new HashMap<>()) != null) {
@@ -53,25 +77,28 @@ abstract class AbstractDispatcherFactory implements DispatcherFactory {
                     if (type.isAnnotation()) {
                         throw new DispatcherException("First delegate parameter must not be annotation: " + method);
                     }
-                    for (final var entry : baseTypeAndParamsToDispatcherMethod.entrySet()) {
-                        if (entry.getKey().isAssignableFrom(type)) {
-                            final var dispatcherMethod = entry.getValue().get(getParameters(parameterTypes));
-                            if (dispatcherMethod != null &&
-                                method.getReturnType() == dispatcherMethod.getReturnType()) {
+                    final var map = baseTypeAndParamsToDispatcherMethod.get(method.getReturnType());
+                    if (map != null) {
+                        for (final var entry : map.entrySet()) {
+                            if (entry.getKey().isAssignableFrom(type)) {
+                                final var dispatcherMethod = entry.getValue().get(getParameters(parameterTypes));
+                                if (dispatcherMethod != null) {
 
-                                final var exceptionTypes = dispatcherMethod.getExceptionTypes();
+                                    final var exceptionTypes = dispatcherMethod.getExceptionTypes();
 
-                                for (final var exceptionType : method.getExceptionTypes()) {
-                                    checkException(exceptionType, exceptionTypes, method, dispatcherMethod);
-                                }
+                                    for (final var exceptionType : method.getExceptionTypes()) {
+                                        checkException(exceptionType, exceptionTypes, method, dispatcherMethod);
+                                    }
 
-                                final var invocationEntry = dispatcherMethodAndImplTypeToDelegate.get(dispatcherMethod)
-                                        .put(type, new InvocationEntry(method, delegate));
+                                    final var invocationEntry =
+                                            dispatcherMethodAndImplTypeToDelegate.get(dispatcherMethod)
+                                                    .put(type, new InvocationEntry(method, delegate));
 
-                                if (invocationEntry != null) {
-                                    throw new DispatcherException(
-                                            "Duplicate delegate method signature: " + invocationEntry.method + " on " +
-                                            invocationEntry.target + " and " + method + " on " + delegate);
+                                    if (invocationEntry != null) {
+                                        throw new DispatcherException(
+                                                "Duplicate delegate method signature: " + invocationEntry.method +
+                                                " on " + invocationEntry.target + " and " + method + " on " + delegate);
+                                    }
                                 }
                             }
                         }
@@ -79,8 +106,7 @@ abstract class AbstractDispatcherFactory implements DispatcherFactory {
                 }
             }
         }
-
-        return createStub(dispatcherType, dispatcherMethodAndImplTypeToDelegate);
+        return dispatcherMethodAndImplTypeToDelegate;
     }
 
     private static void checkException(

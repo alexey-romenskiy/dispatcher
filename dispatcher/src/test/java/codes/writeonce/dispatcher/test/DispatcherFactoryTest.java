@@ -11,7 +11,7 @@ import java.io.IOException;
 
 import static org.junit.Assert.assertEquals;
 
-public class ReflectionDispatcherFactoryTest {
+public class DispatcherFactoryTest {
 
     private static final DispatcherFactory FACTORY1 = new JavassistDispatcherFactory();
     private static final DispatcherFactory FACTORY2 = new ReflectionDispatcherFactory();
