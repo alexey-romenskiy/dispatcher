@@ -9,14 +9,14 @@ public class Helper {
 
     @Nonnull
     public static <T> T find(
-            @Nonnull Map<Class<?>, T> implTypeToDelegate,
+            @Nonnull Map<Class<?>, InheritedEntry<T>> implTypeToDelegate,
             @Nonnull Method dispatcherMethod,
             @Nonnull Class<?> aClass
     ) {
         final var entry = implTypeToDelegate.get(aClass);
 
         if (entry != null) {
-            return entry;
+            return entry.impl;
         }
 
         final var entry2 = findMissing(implTypeToDelegate, dispatcherMethod, aClass, aClass);
@@ -27,12 +27,12 @@ public class Helper {
         }
 
         implTypeToDelegate.put(aClass, entry2);
-        return entry2;
+        return entry2.impl;
     }
 
     @Nullable
-    public static <T> T find(
-            @Nonnull Map<Class<?>, T> implTypeToDelegate,
+    private static <T> InheritedEntry<T> find(
+            @Nonnull Map<Class<?>, InheritedEntry<T>> implTypeToDelegate,
             @Nonnull Method dispatcherMethod,
             @Nonnull Class<?> originalClass,
             @Nonnull Class<?> aClass
@@ -53,8 +53,8 @@ public class Helper {
     }
 
     @Nullable
-    private static <T> T findMissing(
-            @Nonnull Map<Class<?>, T> implTypeToDelegate,
+    private static <T> InheritedEntry<T> findMissing(
+            @Nonnull Map<Class<?>, InheritedEntry<T>> implTypeToDelegate,
             @Nonnull Method dispatcherMethod,
             @Nonnull Class<?> originalClass,
             @Nonnull Class<?> aClass
@@ -66,8 +66,7 @@ public class Helper {
         if (superclass != null) {
             final var entry = find(implTypeToDelegate, dispatcherMethod, originalClass, superclass);
             if (entry != null) {
-                check(implTypeToDelegate, dispatcherMethod, originalClass, interfaces, length, 0, entry);
-                return entry;
+                return check(implTypeToDelegate, dispatcherMethod, originalClass, interfaces, length, 0, entry);
             }
         }
 
@@ -75,8 +74,8 @@ public class Helper {
     }
 
     @Nullable
-    private static <T> T first(
-            @Nonnull Map<Class<?>, T> implTypeToDelegate,
+    private static <T> InheritedEntry<T> first(
+            @Nonnull Map<Class<?>, InheritedEntry<T>> implTypeToDelegate,
             @Nonnull Method dispatcherMethod,
             @Nonnull Class<?> originalClass,
             @Nonnull Class<?>[] interfaces,
@@ -85,28 +84,37 @@ public class Helper {
         for (int i = 0; i < length; i++) {
             final var entry = find(implTypeToDelegate, dispatcherMethod, originalClass, interfaces[i]);
             if (entry != null) {
-                check(implTypeToDelegate, dispatcherMethod, originalClass, interfaces, length, i + 1, entry);
-                return entry;
+                return check(implTypeToDelegate, dispatcherMethod, originalClass, interfaces, length, i + 1, entry);
             }
         }
         return null;
     }
 
-    private static <T> void check(
-            @Nonnull Map<Class<?>, T> implTypeToDelegate,
+    private static <T> InheritedEntry<T> check(
+            @Nonnull Map<Class<?>, InheritedEntry<T>> implTypeToDelegate,
             @Nonnull Method dispatcherMethod,
             @Nonnull Class<?> originalClass,
             @Nonnull Class<?>[] interfaces,
             int length,
             int i,
-            @Nonnull T entry
+            @Nonnull InheritedEntry<T> entry
     ) {
         for (; i < length; i++) {
             final var entry2 = find(implTypeToDelegate, dispatcherMethod, originalClass, interfaces[i]);
             if (entry2 != null && entry2 != entry) {
-                throw new AmbiguousTypeDispatcherException(
-                        "Ambiguous mapping for type: " + originalClass + " for method: " + dispatcherMethod);
+                final Class<?> baseType = entry.baseType;
+                final Class<?> baseType2 = entry2.baseType;
+                final var assignable1 = baseType.isAssignableFrom(baseType2);
+                final var assignable2 = baseType2.isAssignableFrom(baseType);
+                if (assignable1 && !assignable2) {
+                    entry = entry2;
+                } else if (assignable1 || !assignable2) {
+                    throw new AmbiguousTypeDispatcherException(
+                            "Ambiguous mapping for type: " + originalClass + " for method: " + dispatcherMethod +
+                            " (could be " + baseType + " or " + baseType2 + ")");
+                }
             }
         }
+        return entry;
     }
 }

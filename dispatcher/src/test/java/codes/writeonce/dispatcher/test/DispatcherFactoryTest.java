@@ -74,14 +74,14 @@ public class DispatcherFactoryTest {
         }));
     }
 
-    @Test(expected = AmbiguousTypeDispatcherException.class)
+    @Test
     public void wrapF1() throws IOException {
-        FACTORY1.wrap(DispatcherInterface.class, new Delegate()).dispatch(new ClassF());
+        assertEquals("bar", FACTORY1.wrap(DispatcherInterface.class, new Delegate()).dispatch(new ClassF()));
     }
 
-    @Test(expected = AmbiguousTypeDispatcherException.class)
+    @Test
     public void wrapF2() throws IOException {
-        FACTORY2.wrap(DispatcherInterface.class, new Delegate()).dispatch(new ClassF());
+        assertEquals("bar", FACTORY2.wrap(DispatcherInterface.class, new Delegate()).dispatch(new ClassF()));
     }
 
     @Test

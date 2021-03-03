@@ -14,91 +14,91 @@ public class FakeDispatcherFactoryTest {
 
     @Test(expected = UnmappableTypeDispatcherException.class)
     public void wrapA1() {
-        FACTORY1.test(DispatcherInterface.class, new Object[]{new Delegate()}, ClassA.class);
+        FACTORY1.test(DispatcherInterface.class, new Class<?>[]{Delegate.class}, ClassA.class);
     }
 
     @Test(expected = UnmappableTypeDispatcherException.class)
     public void wrapA2() {
-        FACTORY2.test(DispatcherInterface.class, new Object[]{new Delegate()}, ClassA.class);
+        FACTORY2.test(DispatcherInterface.class, new Class<?>[]{Delegate.class}, ClassA.class);
     }
 
     @Test(expected = UnmappableTypeDispatcherException.class)
     public void wrapB1() {
-        FACTORY1.test(DispatcherInterface.class, new Object[]{new Delegate()}, ClassB.class);
+        FACTORY1.test(DispatcherInterface.class, new Class<?>[]{Delegate.class}, ClassB.class);
     }
 
     @Test(expected = UnmappableTypeDispatcherException.class)
     public void wrapB2() {
-        FACTORY2.test(DispatcherInterface.class, new Object[]{new Delegate()}, ClassB.class);
+        FACTORY2.test(DispatcherInterface.class, new Class<?>[]{Delegate.class}, ClassB.class);
     }
 
     @Test
     public void wrapC1() {
-        FACTORY1.test(DispatcherInterface.class, new Object[]{new Delegate()}, ClassC.class);
+        FACTORY1.test(DispatcherInterface.class, new Class<?>[]{Delegate.class}, ClassC.class);
     }
 
     @Test
     public void wrapC2() {
-        FACTORY2.test(DispatcherInterface.class, new Object[]{new Delegate()}, ClassC.class);
+        FACTORY2.test(DispatcherInterface.class, new Class<?>[]{Delegate.class}, ClassC.class);
     }
 
     @Test
     public void wrapD1() {
-        FACTORY1.test(DispatcherInterface.class, new Object[]{new Delegate()}, ClassD.class);
+        FACTORY1.test(DispatcherInterface.class, new Class<?>[]{Delegate.class}, ClassD.class);
     }
 
     @Test
     public void wrapD2() {
-        FACTORY2.test(DispatcherInterface.class, new Object[]{new Delegate()}, ClassD.class);
+        FACTORY2.test(DispatcherInterface.class, new Class<?>[]{Delegate.class}, ClassD.class);
     }
 
     @Test
     public void wrapE1() {
-        FACTORY1.test(DispatcherInterface.class, new Object[]{new Delegate()}, ClassE.class);
+        FACTORY1.test(DispatcherInterface.class, new Class<?>[]{Delegate.class}, ClassE.class);
     }
 
     @Test
     public void wrapE2() {
-        FACTORY2.test(DispatcherInterface.class, new Object[]{new Delegate()}, ClassE.class);
+        FACTORY2.test(DispatcherInterface.class, new Class<?>[]{Delegate.class}, ClassE.class);
     }
 
-    @Test(expected = AmbiguousTypeDispatcherException.class)
+    @Test
     public void wrapF1() {
-        FACTORY1.test(DispatcherInterface.class, new Object[]{new Delegate()}, ClassF.class);
+        FACTORY1.test(DispatcherInterface.class, new Class<?>[]{Delegate.class}, ClassF.class);
     }
 
-    @Test(expected = AmbiguousTypeDispatcherException.class)
+    @Test
     public void wrapF2() {
-        FACTORY2.test(DispatcherInterface.class, new Object[]{new Delegate()}, ClassF.class);
+        FACTORY2.test(DispatcherInterface.class, new Class<?>[]{Delegate.class}, ClassF.class);
     }
 
     @Test
     public void wrapG1() {
-        FACTORY1.test(DispatcherInterface.class, new Object[]{new Delegate()}, ClassG.class);
+        FACTORY1.test(DispatcherInterface.class, new Class<?>[]{Delegate.class}, ClassG.class);
     }
 
     @Test
     public void wrapG2() {
-        FACTORY2.test(DispatcherInterface.class, new Object[]{new Delegate()}, ClassG.class);
+        FACTORY2.test(DispatcherInterface.class, new Class<?>[]{Delegate.class}, ClassG.class);
     }
 
     @Test
     public void wrapH1() {
-        FACTORY1.test(DispatcherInterface.class, new Object[]{new Delegate()}, ClassH.class);
+        FACTORY1.test(DispatcherInterface.class, new Class<?>[]{Delegate.class}, ClassH.class);
     }
 
     @Test
     public void wrapH2() {
-        FACTORY2.test(DispatcherInterface.class, new Object[]{new Delegate()}, ClassH.class);
+        FACTORY2.test(DispatcherInterface.class, new Class<?>[]{Delegate.class}, ClassH.class);
     }
 
     @Test(expected = AmbiguousTypeDispatcherException.class)
     public void wrapI1() {
-        FACTORY1.test(DispatcherInterface.class, new Object[]{new Delegate()}, ClassI.class);
+        FACTORY1.test(DispatcherInterface.class, new Class<?>[]{Delegate.class}, ClassI.class);
     }
 
     @Test(expected = AmbiguousTypeDispatcherException.class)
     public void wrapI2() {
-        FACTORY2.test(DispatcherInterface.class, new Object[]{new Delegate()}, ClassI.class);
+        FACTORY2.test(DispatcherInterface.class, new Class<?>[]{Delegate.class}, ClassI.class);
     }
 }

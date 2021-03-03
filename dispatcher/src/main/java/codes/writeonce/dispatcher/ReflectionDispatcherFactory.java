@@ -14,12 +14,13 @@ public class ReflectionDispatcherFactory extends AbstractDispatcherFactory {
     @Override
     protected <T> T createStub(
             @Nonnull Class<T> dispatcherType,
-            @Nonnull Map<Method, Map<Class<?>, InvocationEntry>> map
+            @Nonnull Map<Method, Map<Class<?>, InheritedEntry<InvocationEntry>>> map
     ) {
         for (final var entry : map.entrySet()) {
             for (final var value : entry.getValue().values()) {
-                final var method = value.method;
-                if (!method.canAccess(value.target)) {
+                final var invocationEntry = value.impl;
+                final var method = invocationEntry.method;
+                if (!method.canAccess(invocationEntry.target)) {
                     method.setAccessible(true);
                 }
             }
@@ -35,7 +36,7 @@ public class ReflectionDispatcherFactory extends AbstractDispatcherFactory {
     }
 
     private static Object invoke(
-            @Nonnull Map<Method, Map<Class<?>, InvocationEntry>> dispatcherMethodAndImplTypeToDelegate,
+            @Nonnull Map<Method, Map<Class<?>, InheritedEntry<InvocationEntry>>> dispatcherMethodAndImplTypeToDelegate,
             @Nonnull Method dispatcherMethod,
             @Nonnull Class<?> aClass,
             @Nonnull Object[] args

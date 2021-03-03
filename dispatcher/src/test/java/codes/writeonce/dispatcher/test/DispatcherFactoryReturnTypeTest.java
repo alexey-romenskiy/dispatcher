@@ -13,11 +13,11 @@ public class DispatcherFactoryReturnTypeTest {
 
     @Test
     public void wrap1() {
-        FACTORY1.test(DispatcherInterface2.class, new Object[]{new Delegate2()}, ClassA.class);
+        FACTORY1.test(DispatcherInterface2.class, new Class<?>[]{Delegate2.class}, ClassA.class);
     }
 
     @Test
     public void wrap2() {
-        FACTORY2.test(DispatcherInterface2.class, new Object[]{new Delegate2()}, ClassA.class);
+        FACTORY2.test(DispatcherInterface2.class, new Class<?>[]{Delegate2.class}, ClassA.class);
     }
 }

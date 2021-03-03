@@ -8,23 +8,25 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
 import static codes.writeonce.dispatcher.Helper.find;
 import static java.util.Arrays.asList;
+import static java.util.function.Function.identity;
 
 abstract class AbstractDispatcherFactory implements DispatcherFactory {
 
     @Override
     @Nonnull
     public <T> T wrap(@Nonnull Class<T> dispatcherType, @Nonnull Object... delegates) {
-        return createStub(dispatcherType, generateMap(dispatcherType, delegates));
+        return createStub(dispatcherType, generateMap(dispatcherType, Object::getClass, delegates));
     }
 
     @Override
-    public void test(@Nonnull Class<?> dispatcherType, @Nonnull Object[] delegates, @Nonnull Class<?>... subtypes)
+    public void test(@Nonnull Class<?> dispatcherType, @Nonnull Class<?>[] delegates, @Nonnull Class<?>... subtypes)
             throws DispatcherException {
 
-        final var map = generateMap(dispatcherType, delegates);
+        final var map = generateMap(dispatcherType, identity(), delegates);
 
         for (final var method : dispatcherType.getMethods()) {
             for (final var subtype : subtypes) {
@@ -33,10 +35,12 @@ abstract class AbstractDispatcherFactory implements DispatcherFactory {
         }
     }
 
+    @SafeVarargs
     @Nonnull
-    private <T> Map<Method, Map<Class<?>, InvocationEntry>> generateMap(
+    private <T, D> Map<Method, Map<Class<?>, InheritedEntry<InvocationEntry>>> generateMap(
             @Nonnull Class<T> dispatcherType,
-            @Nonnull Object... delegates
+            @Nonnull Function<D, Class<?>> delegateClassFunction,
+            @Nonnull D... delegates
     ) {
         if (!dispatcherType.isInterface()) {
             throw new DispatcherException("First parameter must be interface: " + dispatcherType);
@@ -44,7 +48,8 @@ abstract class AbstractDispatcherFactory implements DispatcherFactory {
 
         final var baseTypeAndParamsToDispatcherMethod =
                 new HashMap<Class<?>, HashMap<Class<?>, Map<List<Class<?>>, Method>>>();
-        final var dispatcherMethodAndImplTypeToDelegate = new HashMap<Method, Map<Class<?>, InvocationEntry>>();
+        final var dispatcherMethodAndImplTypeToDelegate =
+                new HashMap<Method, Map<Class<?>, InheritedEntry<InvocationEntry>>>();
 
         for (final var method : dispatcherType.getMethods()) {
             final var parameterTypes = method.getParameterTypes();
@@ -64,7 +69,7 @@ abstract class AbstractDispatcherFactory implements DispatcherFactory {
         }
 
         for (final var delegate : delegates) {
-            final var delegateClass = delegate.getClass();
+            final var delegateClass = delegateClassFunction.apply(delegate);
             final var methods = delegateClass.getMethods();
             checkClass(delegateClass, new HashSet<>(asList(methods)));
             for (final var method : methods) {
@@ -90,11 +95,13 @@ abstract class AbstractDispatcherFactory implements DispatcherFactory {
                                         checkException(exceptionType, exceptionTypes, method, dispatcherMethod);
                                     }
 
-                                    final var invocationEntry =
+                                    final var inheritedEntry =
                                             dispatcherMethodAndImplTypeToDelegate.get(dispatcherMethod)
-                                                    .put(type, new InvocationEntry(method, delegate));
+                                                    .put(type, new InheritedEntry<>(type,
+                                                            new InvocationEntry(method, delegate)));
 
-                                    if (invocationEntry != null) {
+                                    if (inheritedEntry != null) {
+                                        final var invocationEntry = inheritedEntry.impl;
                                         throw new DispatcherException(
                                                 "Duplicate delegate method signature: " + invocationEntry.method +
                                                 " on " + invocationEntry.target + " and " + method + " on " + delegate);
@@ -171,7 +178,7 @@ abstract class AbstractDispatcherFactory implements DispatcherFactory {
     @Nonnull
     protected abstract <T> T createStub(
             @Nonnull Class<T> dispatcherType,
-            @Nonnull Map<Method, Map<Class<?>, InvocationEntry>> map
+            @Nonnull Map<Method, Map<Class<?>, InheritedEntry<InvocationEntry>>> map
     );
 
     protected static final class InvocationEntry {

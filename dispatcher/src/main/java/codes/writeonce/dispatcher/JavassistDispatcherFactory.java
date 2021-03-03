@@ -27,7 +27,7 @@ public class JavassistDispatcherFactory extends AbstractDispatcherFactory {
     @Override
     protected <T> T createStub(
             @Nonnull Class<T> dispatcherType,
-            @Nonnull Map<Method, Map<Class<?>, InvocationEntry>> map
+            @Nonnull Map<Method, Map<Class<?>, InheritedEntry<InvocationEntry>>> map
     ) {
         try {
             final var myClass = makeClass(dispatcherType);
@@ -59,13 +59,15 @@ public class JavassistDispatcherFactory extends AbstractDispatcherFactory {
 
             int i = 0;
 
-            for (final Map.Entry<Method, Map<Class<?>, InvocationEntry>> entry : map.entrySet()) {
+            for (final Map.Entry<Method, Map<Class<?>, InheritedEntry<InvocationEntry>>> entry : map.entrySet()) {
 
                 final var method = entry.getKey();
-                final Map<Class<?>, T> map2 = new HashMap<>();
+                final Map<Class<?>, InheritedEntry<T>> map2 = new HashMap<>();
 
-                for (final Map.Entry<Class<?>, InvocationEntry> entry2 : entry.getValue().entrySet()) {
-                    map2.put(entry2.getKey(), createStub2(dispatcherType, method, entry2.getValue()));
+                for (final Map.Entry<Class<?>, InheritedEntry<InvocationEntry>> entry2 : entry.getValue().entrySet()) {
+                    final var value = entry2.getValue();
+                    map2.put(entry2.getKey(),
+                            new InheritedEntry<>(value.baseType, createStub2(dispatcherType, method, value.impl)));
                 }
 
                 final var parameterTypes = method.getParameterTypes();
