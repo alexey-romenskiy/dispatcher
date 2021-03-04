@@ -126,7 +126,9 @@ public class JavassistDispatcherFactory extends AbstractDispatcherFactory {
             final Class<?> declaringClass = invocationEntry.method.getDeclaringClass();
             final var delegateExpr =
                     declaringClass == delegateType ? "delegate" : "((" + declaringClass.getName() + ") delegate)";
-            final var args = IntStream.range(1, parameterTypes.length + 1).mapToObj(e -> mapArg(invocationEntry, e))
+            final var args = IntStream.range(0, parameterTypes.length)
+                    .filter(invocationEntry.presentParameters::contains)
+                    .mapToObj(e -> mapArg(invocationEntry, e + 1))
                     .collect(joining(", "));
             myClass.addMethod(CtNewMethod.make(
                     get(method.getReturnType()),

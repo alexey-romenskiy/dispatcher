@@ -44,8 +44,22 @@ public class ReflectionDispatcherFactory extends AbstractDispatcherFactory {
 
         final var entry = find(dispatcherMethodAndImplTypeToDelegate.get(dispatcherMethod), dispatcherMethod, aClass);
 
+        final Object[] args2;
+        final var presentParameters = entry.presentParameters;
+        final var size = presentParameters.size();
+        if (size < args.length) {
+            args2 = new Object[size];
+            for (int i = 0, j = 0; i < args.length; i++) {
+                if (presentParameters.contains(i)) {
+                    args2[j++] = args[i];
+                }
+            }
+        } else {
+            args2 = args;
+        }
+
         try {
-            return entry.method.invoke(entry.target, args);
+            return entry.method.invoke(entry.target, args2);
         } catch (InvocationTargetException e) {
             throw e.getTargetException();
         }

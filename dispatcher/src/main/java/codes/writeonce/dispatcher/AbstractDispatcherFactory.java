@@ -1,6 +1,8 @@
 package codes.writeonce.dispatcher;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.HashMap;
@@ -50,11 +52,23 @@ abstract class AbstractDispatcherFactory implements DispatcherFactory {
                 new HashMap<Class<?>, HashMap<Class<?>, Map<List<Class<?>>, Method>>>();
         final var dispatcherMethodAndImplTypeToDelegate =
                 new HashMap<Method, Map<Class<?>, InheritedEntry<InvocationEntry>>>();
+        final var dispatcherMethodOptionals = new HashMap<Method, Set<Integer>>();
 
         for (final var method : dispatcherType.getMethods()) {
+            final var parameterAnnotations = method.getParameterAnnotations();
             final var parameterTypes = method.getParameterTypes();
             if (parameterTypes.length < 1) {
                 throw new DispatcherException("Dispatcher method has too few parameters: " + method);
+            }
+            if (isAnnotationPresent(parameterAnnotations[0])) {
+                throw new DispatcherException(
+                        "Dispatcher method's first parameter may not have OptionalArg annotation: " + method);
+            }
+            final var optionals = new HashSet<Integer>();
+            for (int i = 1; i < parameterAnnotations.length; i++) {
+                if (isAnnotationPresent(parameterAnnotations[i])) {
+                    optionals.add(i);
+                }
             }
             if (baseTypeAndParamsToDispatcherMethod
                         .computeIfAbsent(method.getReturnType(), k -> new HashMap<>())
@@ -66,6 +80,7 @@ abstract class AbstractDispatcherFactory implements DispatcherFactory {
             if (dispatcherMethodAndImplTypeToDelegate.put(method, new HashMap<>()) != null) {
                 throw new DispatcherException("Duplicate dispatcher method: " + method);
             }
+            dispatcherMethodOptionals.put(method, optionals);
         }
 
         for (final var delegate : delegates) {
@@ -86,8 +101,13 @@ abstract class AbstractDispatcherFactory implements DispatcherFactory {
                     if (map != null) {
                         for (final var entry : map.entrySet()) {
                             if (entry.getKey().isAssignableFrom(type)) {
-                                final var dispatcherMethod = entry.getValue().get(getParameters(parameterTypes));
-                                if (dispatcherMethod != null) {
+                                final var dispatcherMethods =
+                                        getDispatcherMethods(entry.getValue(), dispatcherMethodOptionals, method,
+                                                parameterTypes);
+                                for (final var entry2 : dispatcherMethods.entrySet()) {
+
+                                    final var dispatcherMethod = entry2.getKey();
+                                    final var presentParameters = entry2.getValue();
 
                                     final var exceptionTypes = dispatcherMethod.getExceptionTypes();
 
@@ -95,16 +115,22 @@ abstract class AbstractDispatcherFactory implements DispatcherFactory {
                                         checkException(exceptionType, exceptionTypes, method, dispatcherMethod);
                                     }
 
-                                    final var inheritedEntry =
-                                            dispatcherMethodAndImplTypeToDelegate.get(dispatcherMethod)
-                                                    .put(type, new InheritedEntry<>(type,
-                                                            new InvocationEntry(method, delegate)));
+                                    final var entryMap = dispatcherMethodAndImplTypeToDelegate.get(dispatcherMethod);
+                                    final var inheritedEntry = entryMap.get(type);
 
                                     if (inheritedEntry != null) {
-                                        final var invocationEntry = inheritedEntry.impl;
-                                        throw new DispatcherException(
-                                                "Duplicate delegate method signature: " + invocationEntry.method +
-                                                " on " + invocationEntry.target + " and " + method + " on " + delegate);
+                                        final var impl = inheritedEntry.impl;
+                                        if (extending(presentParameters, impl.presentParameters)) {
+                                            entryMap.put(type, new InheritedEntry<>(type,
+                                                    new InvocationEntry(method, delegate, presentParameters)));
+                                        } else if (!extending(impl.presentParameters, presentParameters)) {
+                                            throw new DispatcherException(
+                                                    "Duplicate or ambiguous delegate method signature: " + impl.method +
+                                                    " on " + impl.target + " and " + method + " on " + delegate);
+                                        }
+                                    } else {
+                                        entryMap.put(type, new InheritedEntry<>(type,
+                                                new InvocationEntry(method, delegate, presentParameters)));
                                     }
                                 }
                             }
@@ -114,6 +140,127 @@ abstract class AbstractDispatcherFactory implements DispatcherFactory {
             }
         }
         return dispatcherMethodAndImplTypeToDelegate;
+    }
+
+    private boolean isAnnotationPresent(@Nonnull Annotation[] parameterAnnotation) {
+
+        for (final var annotation : parameterAnnotation) {
+            if (annotation.annotationType() == OptionalArg.class) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean extending(@Nonnull Set<Integer> highPresentParameters, @Nonnull Set<Integer> lowPresentParameters) {
+
+        final var set = new HashSet<>(highPresentParameters);
+
+        for (final var parameter : lowPresentParameters) {
+            if (!set.remove(parameter)) {
+                return false;
+            }
+        }
+
+        return !set.isEmpty();
+    }
+
+    @Nonnull
+    private Map<Method, Set<Integer>> getDispatcherMethods(
+            @Nonnull Map<List<Class<?>>, Method> map,
+            @Nonnull Map<Method, Set<Integer>> dispatcherMethodOptionals,
+            @Nonnull Method candidateMethod,
+            @Nonnull Class<?>[] parameterTypes
+    ) {
+        final var methods = new HashMap<Method, Set<Integer>>();
+        for (final var method : map.values()) {
+            final var optionals = dispatcherMethodOptionals.get(method);
+            final var presentParameters =
+                    getPresentParameters(method, method.getParameterTypes(), optionals, candidateMethod, parameterTypes,
+                            1, 1);
+            if (presentParameters != null) {
+                presentParameters.add(0);
+                methods.put(method, presentParameters);
+            }
+        }
+        return methods;
+    }
+
+    @Nullable
+    private Set<Integer> getPresentParameters(
+            @Nonnull Method method,
+            @Nonnull Class<?>[] methodParameterTypes,
+            @Nonnull Set<Integer> methodOptionals,
+            @Nonnull Method candidateMethod,
+            @Nonnull Class<?>[] parameterTypes,
+            int i,
+            int j
+    ) {
+        Set<Integer> set = null;
+        while (true) {
+            if (j == parameterTypes.length) {
+                while (i < methodParameterTypes.length) {
+                    if (!methodOptionals.contains(i)) {
+                        return null;
+                    }
+                    i++;
+                }
+                return set == null ? new HashSet<>() : set;
+            }
+            while (true) {
+                if (parameterTypes.length - j > methodParameterTypes.length - i) {
+                    return null;
+                }
+                if (methodParameterTypes[i] == parameterTypes[j]) {
+                    if (methodOptionals.contains(i)) {
+                        final var set2 =
+                                getPresentParameters(method, methodParameterTypes, methodOptionals, candidateMethod,
+                                        parameterTypes, i + 1, j);
+                        final var set3 =
+                                getPresentParameters(method, methodParameterTypes, methodOptionals, candidateMethod,
+                                        parameterTypes, i + 1, j + 1);
+                        if (set2 == null) {
+                            if (set3 == null) {
+                                return null;
+                            } else {
+                                if (set == null) {
+                                    set = new HashSet<>(set3.size() + 1);
+                                }
+                                set.add(i);
+                                set.addAll(set3);
+                                return set;
+                            }
+                        } else {
+                            if (set3 == null) {
+                                if (set == null) {
+                                    return set2;
+                                } else {
+                                    set.addAll(set2);
+                                    return set;
+                                }
+                            } else {
+                                throw new AmbiguousTypeDispatcherException(
+                                        "Ambiguous method parameters: " + candidateMethod + " for method: " + method);
+                            }
+                        }
+                    } else {
+                        if (set == null) {
+                            set = new HashSet<>(methodParameterTypes.length - i);
+                        }
+                        set.add(i);
+                        i++;
+                        j++;
+                        break;
+                    }
+                } else {
+                    if (methodOptionals.contains(i)) {
+                        i++;
+                    } else {
+                        return null;
+                    }
+                }
+            }
+        }
     }
 
     private static void checkException(
@@ -189,9 +336,14 @@ abstract class AbstractDispatcherFactory implements DispatcherFactory {
         @Nonnull
         public final Object target;
 
-        public InvocationEntry(@Nonnull Method method, @Nonnull Object target) {
+        @Nonnull
+        public final Set<Integer> presentParameters;
+
+        public InvocationEntry(@Nonnull Method method, @Nonnull Object target,
+                @Nonnull Set<Integer> presentParameters) {
             this.method = method;
             this.target = target;
+            this.presentParameters = presentParameters;
         }
     }
 }
